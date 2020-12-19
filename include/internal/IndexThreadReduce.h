@@ -29,7 +29,7 @@ namespace ldso {
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 
             inline IndexThreadReduce() {
-                callPerIndex = bind(&IndexThreadReduce::callPerIndexDefault, this, _1, _2, _3, _4);
+                callPerIndex = bind(&IndexThreadReduce::callPerIndexDefault, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4);
                 for (int i = 0; i < NUM_THREADS; i++) {
                     isDone[i] = false;
                     gotOne[i] = true;
@@ -96,7 +96,7 @@ namespace ldso {
 
                 nextIndex = 0;
                 maxIndex = 0;
-                this->callPerIndex = bind(&IndexThreadReduce::callPerIndexDefault, this, _1, _2, _3, _4);
+                this->callPerIndex = bind(&IndexThreadReduce::callPerIndexDefault, this, std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, std::placeholders::_4);
             }
 
             Running stats;
