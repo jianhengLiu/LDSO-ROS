@@ -1,3 +1,49 @@
+# LDSO_ROS
+
+## Run
+
+**TUM-Mono:**
+
+To run LDSO on TUM-Mono dataset sequence 34, execute:
+
+```bash
+rosrun ldso_ros run_dso_tum_mono \
+	preset=0 \
+    files=/home/chrisliu/Dataset/TUM-Mono/sequence_10/images.zip \
+    vignette=/home/chrisliu/Dataset/TUM-Mono/sequence_10/vignette.png \
+    calib=/home/chrisliu/Dataset/TUM-Mono/sequence_10/camera.txt \
+    gamma=/home/chrisliu/Dataset/TUM-Mono/sequence_10/pcalib.txt \
+    vocab=src/ldso_ros/vocab/orbvoc.dbow3
+```
+
+**Kitti:**
+
+To run LDSO on Kitti dataset sequence 00, execute:
+
+```
+rosrun ldso_ros run_dso_kitti \
+    preset=0 \
+    files=XXXXX/Kitti/odometry/dataset/sequences/00/ \
+    calib=./examples/Kitti/Kitti00-02.txt \
+    vocab=src/ldso_ros/vocab/orbvoc.dbow3
+```
+
+**EuRoC:**
+
+To run LDSO on EuRoC dataset sequence MH_01_easy, execute:
+
+```bash
+rosrun ldso_ros run_dso_euroc \
+        preset=0 \
+    files=/home/chrisliu/Dataset/Euroc/MH_03_medium/mav0/cam0/ \
+    calib=src/ldso_ros/examples/EUROC/EUROC.txt \
+    vocab=src/ldso_ros/vocab/orbvoc.dbow3
+```
+
+## 
+
+
+
 # LDSO: Direct Sparse Odometry with Loop Closure
 
 ## Related Publications
@@ -28,9 +74,9 @@ On OSX you can install these via Homebrew.
 Compile and install
 [Pangolin](https://github.com/stevenlovegrove/Pangolin) for
 visualization.
- 
+
 ### Compile
- 
+
  ```
  ./make_project.sh
  ```
@@ -104,7 +150,7 @@ To run LDSO on EuRoC dataset sequence MH_01_easy, execute:
    
  - If you are looking for code instructions, take a look at
    `doc/notes_on_ldso.pdf` and see if it can help you.
- 
+
  - Set `setting_enableLoopClosing` to true/false to turn on/off loop
    closing function. `setting_fastLoopClosing` will record less data and
    make the loop closing faster.

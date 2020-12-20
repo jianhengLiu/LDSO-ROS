@@ -1,5 +1,3 @@
-#include <ros/ros.h>
-
 #include <thread>
 #include <clocale>
 #include <csignal>
@@ -13,33 +11,73 @@
 #include "frontend/FullSystem.h"
 #include "DatasetReader.h"
 
-/*********************************************************************************
- * This program demonstrates how to run LDSO in TUM-Mono dataset
- * which is the default dataset in DSO and quite difficult because of low texture
- * Please specify the dataset directory below or by command line parameters
- *********************************************************************************/
+#include <ros/ros.h>
+#include <sensor_msgs/image_encodings.h>
+#include <sensor_msgs/Image.h>
+#include <sensor_msgs/CameraInfo.h>
+#include <geometry_msgs/PoseStamped.h>
+#include "cv_bridge/cv_bridge.h"
 
 using namespace std;
 using namespace ldso;
 
-std::string vignette = "/media/gaoxiang/Data1/Dataset/TUM-MONO/sequence_31/vignette.png";
-std::string gammaCalib = "/media/gaoxiang/Data1/Dataset/TUM-MONO/sequence_31/pcalib.txt";
-std::string source = "/media/gaoxiang/Data1/Dataset/TUM-MONO/sequence_31/";
-std::string calib = "/media/gaoxiang/Data1/Dataset/TUM-MONO/sequence_31/camera.txt";
+/*********************************************************************************
+ * This program demonstrates how to run LDSO in EUROC dataset
+ * LDSO currently works on MAV_01-05 and V101, V102, V201
+ * Note we don't have photometric calibration in EUROC so we should let the algorithm
+ * estimate lighting parameter a,b for us
+ *
+ * You'd better set a start index greater than zero since DSO does not work well on blurred images
+ *
+ * Please specify the dataset directory below or by command line parameters
+ *********************************************************************************/
+
+std::string source = "/home/xiang/Dataset/EUROC/MH_01_easy/cam0";
 std::string output_file = "./results.txt";
-std::string vocPath = "./vocab/orbvoc.dbow3";
+std::string calib = "/home/chrisliu/ROSws/ldso_ws/src/ldso_ros/examples/EUROC/EUROC.txt";
+std::string vocPath = "/home/chrisliu/ROSws/ldso_ws/src/ldso_ros/vocab/orbvoc.dbow3";
+
+int startIdx = 0;
+int endIdx = 100000;
 
 double rescale = 1;
 bool reversePlay = false;
 bool disableROS = false;
-int startIdx = 0;
-int endIdx = 100000;
 bool prefetch = false;
 float playbackSpeed = 0;    // 0 for linearize (play as fast as possible, while sequentializing tracking & mapping). otherwise, factor on timestamps.
 bool preload = false;
 bool useSampleOutput = false;
 
-using namespace ldso;
+shared_ptr<FullSystem> fullSystem;
+int frameID = 0;
+void vidCb(const sensor_msgs::ImageConstPtr img)
+{
+    cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::MONO8);
+    assert(cv_ptr->image.type() == CV_8U);
+    assert(cv_ptr->image.channels() == 1);
+
+
+    if(setting_fullResetRequested)
+    {
+        std::vector<IOWrap::Output3DWrapper*> wraps = fullSystem->outputWrapper;
+        delete fullSystem;
+        for(IOWrap::Output3DWrapper* ow : wraps) ow->reset();
+        fullSystem = new FullSystem();
+        fullSystem->linearizeOperation=false;
+        fullSystem->outputWrapper = wraps;
+        if(undistorter->photometricUndist != 0)
+            fullSystem->setGammaFunction(undistorter->photometricUndist->getG());
+        setting_fullResetRequested=false;
+    }
+
+    MinimalImageB minImg((int)cv_ptr->image.cols, (int)cv_ptr->image.rows,(unsigned char*)cv_ptr->image.data);
+    ImageAndExposure* undistImg = undistorter->undistort<unsigned char>(&minImg, 1,0, 1.0f);
+    undistImg->timestamp=img->header.stamp.toSec(); // relay the timestamp to dso
+    fullSystem->addActiveFrame(undistImg, frameID);
+    frameID++;
+    delete undistImg;
+
+}
 
 void settingsDefault(int preset) {
     printf("\n=============== PRESET Settings: ===============\n");
@@ -52,7 +90,6 @@ void settingsDefault(int preset) {
                "- original image resolution\n", preset == 0 ? "no " : "1x");
 
         playbackSpeed = (preset == 0 ? 0 : 1);
-        preload = preset == 1;
         setting_desiredImmatureDensity = 1500;
         setting_desiredPointDensity = 2000;
         setting_minFrames = 5;
@@ -73,7 +110,6 @@ void settingsDefault(int preset) {
                preset == 2 ? "no " : "5x");
 
         playbackSpeed = (preset == 2 ? 0 : 5);
-        preload = preset == 3;
         setting_desiredImmatureDensity = 600;
         setting_desiredPointDensity = 800;
         setting_minFrames = 4;
@@ -89,6 +125,7 @@ void settingsDefault(int preset) {
 
     printf("==============================================\n");
 }
+
 
 void parseArgument(char *arg) {
     int option;
@@ -143,6 +180,7 @@ void parseArgument(char *arg) {
         }
         return;
     }
+
     if (1 == sscanf(arg, "reversePlay=%d", &option)) {
         if (option == 1) {
             reversePlay = true;
@@ -150,6 +188,7 @@ void parseArgument(char *arg) {
         }
         return;
     }
+
     if (1 == sscanf(arg, "nogui=%d", &option)) {
         if (option == 1) {
             disableAllDisplay = true;
@@ -181,43 +220,10 @@ void parseArgument(char *arg) {
         printf("END AT %d!\n", endIdx);
         return;
     }
-    if (1 == sscanf(arg, "loopclosing=%d", &option)) {
-        if (option == 1) {
-            setting_enableLoopClosing = true;
-        } else {
-            setting_enableLoopClosing = false;
-        }
-        printf("Loopclosing %s!\n", setting_enableLoopClosing ? "enabled" : "disabled");
-        return;
-    }
 
     if (1 == sscanf(arg, "files=%s", buf)) {
         source = buf;
         printf("loading data from %s!\n", source.c_str());
-        return;
-    }
-
-    if (1 == sscanf(arg, "vocab=%s", buf)) {
-        vocPath = buf;
-        printf("loading vocabulary from %s!\n", vocPath.c_str());
-        return;
-    }
-
-    if (1 == sscanf(arg, "calib=%s", buf)) {
-        calib = buf;
-        printf("loading calibration from %s!\n", calib.c_str());
-        return;
-    }
-
-    if (1 == sscanf(arg, "vignette=%s", buf)) {
-        vignette = buf;
-        printf("loading vignette from %s!\n", vignette.c_str());
-        return;
-    }
-
-    if (1 == sscanf(arg, "gamma=%s", buf)) {
-        gammaCalib = buf;
-        printf("loading gammaCalib from %s!\n", gammaCalib.c_str());
         return;
     }
 
@@ -239,6 +245,18 @@ void parseArgument(char *arg) {
         return;
     }
 
+    if (1 == sscanf(arg, "calib=%s", buf)) {
+        calib = buf;
+        printf("loading calibration from %s!\n", calib.c_str());
+        return;
+    }
+
+    if (1 == sscanf(arg, "vocab=%s", buf)) {
+        vocPath = buf;
+        printf("loading vocab from %s!\n", vocPath.c_str());
+        return;
+    }
+
     if (1 == sscanf(arg, "save=%d", &option)) {
         if (option == 1) {
             debugSaveImages = true;
@@ -256,22 +274,20 @@ void parseArgument(char *arg) {
     }
 
     if (1 == sscanf(arg, "mode=%d", &option)) {
-        if (option == 0) {
-            printf("PHOTOMETRIC MODE WITH CALIBRATION!\n");
+        if (option != 1) {
+            LOG(ERROR) << "EuRoC does not have photometric intrinsics! I will exit!" << endl;
+            exit(-1);
         }
+        return;
+    }
+
+    if (1 == sscanf(arg, "loopclosing=%d", &option)) {
         if (option == 1) {
-            printf("PHOTOMETRIC MODE WITHOUT CALIBRATION!\n");
-            setting_photometricCalibration = 0;
-            setting_affineOptModeA = 0; //-1: fix. >=0: optimize (with prior, if > 0).
-            setting_affineOptModeB = 0; //-1: fix. >=0: optimize (with prior, if > 0).
+            setting_enableLoopClosing = true;
+        } else {
+            setting_enableLoopClosing = false;
         }
-        if (option == 2) {
-            printf("PHOTOMETRIC MODE WITH PERFECT IMAGES!\n");
-            setting_photometricCalibration = 0;
-            setting_affineOptModeA = -1; //-1: fix. >=0: optimize (with prior, if > 0).
-            setting_affineOptModeB = -1; //-1: fix. >=0: optimize (with prior, if > 0).
-            setting_minGradHistAdd = 3;
-        }
+        printf("Loopclosing %s!\n", setting_enableLoopClosing ? "enabled" : "disabled");
         return;
     }
 
@@ -279,48 +295,42 @@ void parseArgument(char *arg) {
 }
 
 int main(int argc, char **argv) {
+    ros::init(argc, argv, "dso_node");
 
     FLAGS_colorlogtostderr = true;
+    setting_maxAffineWeight = 0.1;  // don't use affine brightness weight in Euroc!
+
     for (int i = 1; i < argc; i++)
         parseArgument(argv[i]);
 
-    // check setting conflicts
-    if (setting_enableLoopClosing && (setting_pointSelection != 1)) {
-        LOG(ERROR) << "Loop closing is enabled but point selection strategy is not set to LDSO, "
-                      "use setting_pointSelection=1! please!" << endl;
-        exit(-1);
-    }
-
-    if (setting_showLoopClosing) {
-        LOG(WARNING) << "show loop closing results. The program will be paused when any loop is found" << endl;
-    }
+    // EuRoC has no photometric calibration
+    printf("PHOTOMETRIC MODE WITHOUT CALIBRATION!\n");
+    setting_photometricCalibration = 0;
+    setting_affineOptModeA = 0; //-1: fix. >=0: optimize (with prior, if > 0).
+    setting_affineOptModeB = 0; //-1: fix. >=0: optimize (with prior, if > 0).
 
     shared_ptr<ImageFolderReader> reader(
-            new ImageFolderReader(ImageFolderReader::TUM_MONO, source, calib, gammaCalib, vignette));
+            new ImageFolderReader(ImageFolderReader::EUROC, source, calib, "", ""));    // no gamma and vignette
 
     reader->setGlobalCalibration();
-
-    if (setting_photometricCalibration > 0 && reader->getPhotometricGamma() == 0) {
-        LOG(ERROR) << "ERROR: dont't have photometric calibation. Need to use commandline options mode=1 or mode=2 ";
-        exit(1);
-    }
 
     int lstart = startIdx;
     int lend = endIdx;
     int linc = 1;
-    if (reversePlay) {
-        LOG(INFO) << "REVERSE!!!!";
-        lstart = endIdx - 1;
-        if (lstart >= reader->getNumImages())
-            lstart = reader->getNumImages() - 1;
-        lend = startIdx;
-        linc = -1;
-    }
+
+//    if (reversePlay) {
+//        LOG(INFO) << "REVERSE!!!!";
+//        lstart = endIdx - 1;
+//        if (lstart >= reader->getNumImages())
+//            lstart = reader->getNumImages() - 1;
+//        lend = startIdx;
+//        linc = -1;
+//    }
 
     shared_ptr<ORBVocabulary> voc(new ORBVocabulary());
     voc->load(vocPath);
 
-    shared_ptr<FullSystem> fullSystem(new FullSystem(voc));
+    fullSystem  = shared_ptr<FullSystem>(new FullSystem(voc));
     fullSystem->setGammaFunction(reader->getPhotometricGamma());
     fullSystem->linearizeOperation = (playbackSpeed == 0);
 
@@ -329,7 +339,7 @@ int main(int argc, char **argv) {
         viewer = shared_ptr<PangolinDSOViewer>(new PangolinDSOViewer(wG[0], hG[0], false));
         fullSystem->setViewer(viewer);
     } else {
-        LOG(INFO) << "visualization is disabled!" << endl;
+        LOG(INFO) << "visualization is diabled!" << endl;
     }
 
     // to make MacOS happy: run this in dedicated thread -- and use this one to run the GUI.
@@ -362,12 +372,12 @@ int main(int argc, char **argv) {
         clock_t started = clock();
         double sInitializerOffset = 0;
 
+
         for (int ii = 0; ii < (int) idsToPlay.size(); ii++) {
 
             while (setting_pause == true) {
                 usleep(5000);
             }
-
             if (!fullSystem->initialized)    // if not initialized: reset start time.
             {
                 gettimeofday(&tv_start, NULL);
@@ -382,6 +392,7 @@ int main(int argc, char **argv) {
                 img = preloadedImages[ii];
             else
                 img = reader->getImage(i);
+
 
             bool skipFrame = false;
             if (playbackSpeed != 0) {
@@ -398,14 +409,13 @@ int main(int argc, char **argv) {
                     skipFrame = true;
                 }
             }
-            if (!skipFrame) {
-                fullSystem->addActiveFrame(img, i);
-            }
+//            ************
+            if (!skipFrame) fullSystem->addActiveFrame(img, i);
             delete img;
 
             if (fullSystem->initFailed || setting_fullResetRequested) {
                 if (ii < 250 || setting_fullResetRequested) {
-                    LOG(INFO) << "Init failed, RESETTING!";
+                    LOG(INFO) << "RESETTING!";
                     fullSystem = shared_ptr<FullSystem>(new FullSystem(voc));
                     fullSystem->setGammaFunction(reader->getPhotometricGamma());
                     fullSystem->linearizeOperation = (playbackSpeed == 0);
@@ -431,6 +441,7 @@ int main(int argc, char **argv) {
         struct timeval tv_end;
         gettimeofday(&tv_end, NULL);
 
+        // for evaluation, we print the result before loop closing and after loop closing
         fullSystem->printResult(output_file, true);
         fullSystem->printResult(output_file + ".noloop", false);
 
@@ -467,7 +478,7 @@ int main(int argc, char **argv) {
 
     runthread.join();
 
-    viewer->saveAsPLYFile("./pointcloud.ply");
+
     LOG(INFO) << "EXIT NOW!";
     return 0;
 }

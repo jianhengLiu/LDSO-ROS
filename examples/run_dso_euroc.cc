@@ -27,8 +27,8 @@ using namespace ldso;
 
 std::string source = "/home/xiang/Dataset/EUROC/MH_01_easy/cam0";
 std::string output_file = "./results.txt";
-std::string calib = "./examples/EUROC/EUROC.txt";
-std::string vocPath = "./vocab/orbvoc.dbow3";
+std::string calib = "/home/chrisliu/ROSws/ldso_ws/src/ldso_ros/examples/EUROC/EUROC.txt";
+std::string vocPath = "/home/chrisliu/ROSws/ldso_ws/src/ldso_ros/vocab/orbvoc.dbow3";
 
 int startIdx = 0;
 int endIdx = 100000;
@@ -212,6 +212,12 @@ void parseArgument(char *arg) {
     if (1 == sscanf(arg, "calib=%s", buf)) {
         calib = buf;
         printf("loading calibration from %s!\n", calib.c_str());
+        return;
+    }
+
+    if (1 == sscanf(arg, "vocab=%s", buf)) {
+        vocPath = buf;
+        printf("loading vocab from %s!\n", vocPath.c_str());
         return;
     }
 
