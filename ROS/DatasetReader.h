@@ -203,7 +203,7 @@ public:
 
     // undistorter. [0] always exists, [1-2] only when MT is enabled.
     Undistort *undistort;
-private:
+public:
 
 
     MinimalImageB *getImageRaw_internal(int id, int unused) {

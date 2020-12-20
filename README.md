@@ -40,7 +40,12 @@ rosrun ldso_ros run_dso_euroc \
     vocab=src/ldso_ros/vocab/orbvoc.dbow3
 ```
 
-## 
+## RUN on self device
+
+```bash
+roslaunch realsense2_camera rs_camera.launch
+rosrun ldso_ros run_dso_node
+```
 
 
 

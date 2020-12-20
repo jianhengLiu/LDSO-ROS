@@ -60,8 +60,6 @@ endif()
 
 catkin_package()
 
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -mavx")
-
 include_directories(
         ${catkin_INCLUDE_DIRS}
 
@@ -70,11 +68,8 @@ include_directories(
         ${Pangolin_INCLUDE_DIRS}
         ${Glog_INCLUDE_DIRS}
 
-#        ${PROJECT_SOURCE_DIR}/src/
         ${PROJECT_SOURCE_DIR}/include/
-#        ${PROJECT_SOURCE_DIR}/examples/
         ${PROJECT_SOURCE_DIR}/thirdparty/
-#        ${PROJECT_SOURCE_DIR}/thirdparty/sophus/
         ${PROJECT_SOURCE_DIR}/thirdparty/DBoW3/
         ${PROJECT_SOURCE_DIR}/thirdparty/g2o/
 )
@@ -165,17 +160,14 @@ set( HEADER_FILES
         include/frontend/Undistort.h
         )
 
-#add_subdirectory(src)
-#add_subdirectory(examples)
-
 add_executable(run_dso_tum_mono
         examples/run_dso_tum_mono.cc
         examples/DatasetReader.h
         ${SOURCE_FILES}
         ${HEADER_FILES}
         )
-#add_dependencies(run_dso_tum_mono ${catkin_EXPORTED_TARGETS})
-target_link_libraries(run_dso_tum_mono ${THIRD_PARTY_LIBS})
+target_link_libraries(run_dso_tum_mono
+        ${THIRD_PARTY_LIBS})
 
 add_executable(run_dso_euroc
         examples/run_dso_euroc.cc
@@ -183,8 +175,8 @@ add_executable(run_dso_euroc
         ${SOURCE_FILES}
         ${HEADER_FILES}
         )
-#add_dependencies(run_dso_euroc ${catkin_EXPORTED_TARGETS})
-target_link_libraries(run_dso_euroc ${THIRD_PARTY_LIBS})
+target_link_libraries(run_dso_euroc
+        ${THIRD_PARTY_LIBS})
 
 add_executable(run_dso_kitti
         examples/run_dso_kitti.cc
@@ -192,12 +184,13 @@ add_executable(run_dso_kitti
         ${SOURCE_FILES}
         ${HEADER_FILES}
         )
-#add_dependencies(run_dso_kitti ${catkin_EXPORTED_TARGETS})
-target_link_libraries(run_dso_kitti ${THIRD_PARTY_LIBS})
+target_link_libraries(run_dso_kitti
+        ${THIRD_PARTY_LIBS})
 
-#add_executable(run_dso_node
-#        ROS/run_dso_node.cpp
-#        ${SOURCE_FILES}
-#        ${HEADER_FILES}
-#        )
-#target_link_libraries(run_dso_node ${THIRD_PARTY_LIBS})
+add_executable(run_dso_node
+        ROS/run_dso_node.cpp
+        examples/DatasetReader.h
+        ${SOURCE_FILES}
+        ${HEADER_FILES}
+        )
+target_link_libraries(run_dso_node ${THIRD_PARTY_LIBS})
