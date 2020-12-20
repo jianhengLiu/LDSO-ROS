@@ -1,5 +1,9 @@
 # LDSO_ROS
 
+
+
+
+
 ## Run
 
 **TUM-Mono:**
@@ -42,12 +46,16 @@ rosrun ldso_ros run_dso_euroc \
 
 ## RUN on self device
 
+
+
 ```bash
 roslaunch realsense2_camera rs_camera.launch
 rosrun ldso_ros run_dso_node
 ```
 
+#### Initialization
 
+The current initializer is not very good... it is very slow and occasionally fails. Make sure, the initial camera motion is slow and "nice" (i.e., **a lot of translation and little rotation**) during initialization. Possibly replace by your own initializer.
 
 # LDSO: Direct Sparse Odometry with Loop Closure
 

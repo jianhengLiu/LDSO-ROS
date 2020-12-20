@@ -91,96 +91,17 @@ void vidCb(const sensor_msgs::ImageConstPtr img)
     }
 }
 
-void settingsDefault(int preset) {
-    printf("\n=============== PRESET Settings: ===============\n");
-    if (preset == 0 || preset == 1) {
-        printf("DEFAULT settings:\n"
-               "- %s real-time enforcing\n"
-               "- 2000 active points\n"
-               "- 5-7 active frames\n"
-               "- 1-6 LM iteration each KF\n"
-               "- original image resolution\n", preset == 0 ? "no " : "1x");
-
-        playbackSpeed = (preset == 0 ? 0 : 1);
-        preload = preset == 1;
-        setting_desiredImmatureDensity = 1500;
-        setting_desiredPointDensity = 2000;
-        setting_minFrames = 5;
-        setting_maxFrames = 7;
-        setting_maxOptIterations = 6;
-        setting_minOptIterations = 1;
-
-        setting_logStuff = false;
-    }
-
-    if (preset == 2 || preset == 3) {
-        printf("FAST settings:\n"
-               "- %s real-time enforcing\n"
-               "- 800 active points\n"
-               "- 4-6 active frames\n"
-               "- 1-4 LM iteration each KF\n"
-               "- 424 x 320 image resolution\n",
-               preset == 2 ? "no " : "5x");
-
-        playbackSpeed = (preset == 2 ? 0 : 5);
-        preload = preset == 3;
-        setting_desiredImmatureDensity = 600;
-        setting_desiredPointDensity = 800;
-        setting_minFrames = 4;
-        setting_maxFrames = 6;
-        setting_maxOptIterations = 4;
-        setting_minOptIterations = 1;
-
-        benchmarkSetting_width = 424;
-        benchmarkSetting_height = 320;
-
-        setting_logStuff = false;
-    }
-
-    printf("==============================================\n");
-}
-
 int main(int argc, char **argv) {
-    ros::init(argc, argv, "ldso_node");
+    ros::init(argc, argv, "dso_node");
 
-//    settings:
-    {
-        int option = 1;
-        if (option == 0) {
-            printf("PHOTOMETRIC MODE WITH CALIBRATION!\n");
-        } else if (option == 1) {
-            printf("PHOTOMETRIC MODE WITHOUT CALIBRATION!\n");
-            setting_photometricCalibration = 0;
-            setting_affineOptModeA = 0; //-1: fix. >=0: optimize (with prior, if > 0).
-            setting_affineOptModeB = 0; //-1: fix. >=0: optimize (with prior, if > 0).
-        } else if (option == 2) {
-            printf("PHOTOMETRIC MODE WITH PERFECT IMAGES!\n");
-            setting_photometricCalibration = 0;
-            setting_affineOptModeA = -1; //-1: fix. >=0: optimize (with prior, if > 0).
-            setting_affineOptModeB = -1; //-1: fix. >=0: optimize (with prior, if > 0).
-            setting_minGradHistAdd = 3;
-        }
-        /**
-         * preset=0: default settings (2k pts etc.), not enforcing real-time execution
-         * preset=1: default settings (2k pts etc.), enforcing 1x real-time execution
-         * preset=2: fast settings (800 pts etc.), not enforcing real-time execution. WARNING: overwrites image resolution with 424 x 320.
-         * preset=3: fast settings (800 pts etc.), enforcing 5x real-time execution. WARNING: overwrites image resolution with 424 x 320.
-         * 0,2 效果正常，2会更好点；1,3直接飘走
-         */
-        settingsDefault(2);
-
-        setting_logStuff = false;
-        printf("DISABLE LOGGING!\n");
-
-//        disableAllDisplay = true;
-//        printf("NO GUI!\n");
-
-        setting_debugout_runquiet = true;
-        printf("QUIET MODE, Disable most console output!\n");
-    }
-
-//    FLAGS_colorlogtostderr = true;//    错误等级有颜色区分(Glog)
+    FLAGS_colorlogtostderr = true;
     setting_maxAffineWeight = 0.1;  // don't use affine brightness weight in Euroc!
+
+    // EuRoC has no photometric calibration
+    printf("PHOTOMETRIC MODE WITHOUT CALIBRATION!\n");
+    setting_photometricCalibration = 0;
+    setting_affineOptModeA = 0; //-1: fix. >=0: optimize (with prior, if > 0).
+    setting_affineOptModeB = 0; //-1: fix. >=0: optimize (with prior, if > 0).
 
     undistort = Undistort::getUndistorterForFile(calib, "", "");
 
