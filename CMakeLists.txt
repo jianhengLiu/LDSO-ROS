@@ -39,7 +39,7 @@ find_package(Pangolin REQUIRED)
 find_package (glog 0.4.0 REQUIRED)
 
 # optional libs
-find_package(LIBZIP QUIET)
+find_package(LibZip QUIET)
 
 set(CMAKE_CXX_FLAGS "-Wall -Wno-deprecated -march=native -Wno-duplicate-decl-specifier -Wno-ignored-qualifiers -Wno-reorder -Wno-missing-braces")
 
@@ -164,6 +164,9 @@ set( HEADER_FILES
         include/frontend/PixelSelector2.h
         include/frontend/Undistort.h
         )
+
+#add_subdirectory(src)
+#add_subdirectory(examples)
 
 add_executable(run_dso_tum_mono
         examples/run_dso_tum_mono.cc
