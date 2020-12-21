@@ -148,8 +148,8 @@ namespace ldso {
 
         void saveAsPLYFile(const string &file_name);
 
-    private:
-
+//    private:
+    public:
         bool needReset = false;
 
         void reset_internal();

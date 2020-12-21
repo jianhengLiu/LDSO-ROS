@@ -169,28 +169,28 @@ add_executable(run_dso_tum_mono
 target_link_libraries(run_dso_tum_mono
         ${THIRD_PARTY_LIBS})
 
-add_executable(run_dso_euroc
-        examples/run_dso_euroc.cc
-        examples/DatasetReader.h
-        ${SOURCE_FILES}
-        ${HEADER_FILES}
-        )
-target_link_libraries(run_dso_euroc
-        ${THIRD_PARTY_LIBS})
+#add_executable(run_dso_euroc
+#        examples/run_dso_euroc.cc
+#        examples/DatasetReader.h
+#        ${SOURCE_FILES}
+#        ${HEADER_FILES}
+#        )
+#target_link_libraries(run_dso_euroc
+#        ${THIRD_PARTY_LIBS})
 
-add_executable(run_dso_kitti
-        examples/run_dso_kitti.cc
-        examples/DatasetReader.h
-        ${SOURCE_FILES}
-        ${HEADER_FILES}
-        )
-target_link_libraries(run_dso_kitti
-        ${THIRD_PARTY_LIBS})
+#add_executable(run_dso_kitti
+#        examples/run_dso_kitti.cc
+#        examples/DatasetReader.h
+#        ${SOURCE_FILES}
+#        ${HEADER_FILES}
+#        )
+#target_link_libraries(run_dso_kitti
+#        ${THIRD_PARTY_LIBS})
 
-add_executable(run_dso_node
-        ROS/run_dso_node.cpp
+add_executable(run_ldso_node
+        ROS/run_ldso_node.cpp
         examples/DatasetReader.h
         ${SOURCE_FILES}
         ${HEADER_FILES}
         )
-target_link_libraries(run_dso_node ${THIRD_PARTY_LIBS})
+target_link_libraries(run_ldso_node ${THIRD_PARTY_LIBS})

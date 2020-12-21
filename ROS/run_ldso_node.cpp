@@ -2,6 +2,7 @@
 #include <sensor_msgs/image_encodings.h>
 #include <sensor_msgs/Image.h>
 #include "cv_bridge/cv_bridge.h"
+#include "nav_msgs/Odometry.h"
 
 #include <thread>
 #include <cstdio>
@@ -10,7 +11,8 @@
 #include <glog/logging.h>
 
 #include "frontend/FullSystem.h"
-#include "DatasetReader.h"
+#include "frontend/Undistort.h"
+//#include "DatasetReader.h"
 
 using namespace std;
 using namespace ldso;
@@ -30,22 +32,21 @@ std::string output_file = "./results.txt";
 std::string calib = "/home/chrisliu/ROSws/ldso_ws/src/ldso_ros/config/camera.txt";
 std::string vocPath = "/home/chrisliu/ROSws/ldso_ws/src/ldso_ros/vocab/orbvoc.dbow3";
 
-int startIdx = 0;
-int endIdx = 100000;
+ros::Publisher odom_pub;
 
-double rescale = 1;
-bool reversePlay = false;
 float playbackSpeed = 0;    // 0 for linearize (play as fast as possible, while sequentializing tracking & mapping). otherwise, factor on timestamps.
-bool preload = false;
 
-shared_ptr<PangolinDSOViewer> viewer;
+shared_ptr<FullSystem> fullSystem;
 shared_ptr<ORBVocabulary> voc;
 Undistort *undistort;
 
-shared_ptr<FullSystem> fullSystem;
+shared_ptr<PangolinDSOViewer> viewer;
+
 int frameID = 0;
 void vidCb(const sensor_msgs::ImageConstPtr img)
 {
+//    printf("1");
+
     cv_bridge::CvImagePtr cv_ptr = cv_bridge::toCvCopy(img, sensor_msgs::image_encodings::MONO8);
     assert(cv_ptr->image.type() == CV_8U);
     assert(cv_ptr->image.channels() == 1);
@@ -87,8 +88,41 @@ void vidCb(const sensor_msgs::ImageConstPtr img)
     }
     if (fullSystem->isLost) {
         LOG(INFO) << "Lost!";
-        return;
     }
+
+    auto frame = fullSystem->GetActiveFrames();
+    if(!frame.empty())
+    {
+        auto poseOpti = frame.back()->getPoseOpti().inverse();
+
+        Eigen::Vector3d eulerAngle(0,-EIGEN_PI/2,EIGEN_PI/2);
+        Eigen::AngleAxisd rollAngle(Eigen::AngleAxisd(eulerAngle(2),Eigen::Vector3d::UnitX()));
+        Eigen::AngleAxisd pitchAngle(Eigen::AngleAxisd(eulerAngle(1),Eigen::Vector3d::UnitY()));
+        Eigen::AngleAxisd yawAngle(Eigen::AngleAxisd(eulerAngle(0),Eigen::Vector3d::UnitZ()));
+        Eigen::Quaterniond quaternion;
+        quaternion=yawAngle*pitchAngle*rollAngle;
+
+        auto quad = poseOpti.quaternion();
+        quad = quaternion.inverse()*quad;
+        auto t = poseOpti.translation();
+        t = quaternion.inverse()*t;
+        nav_msgs::Odometry odom;
+        odom.header.frame_id = "world";
+        odom.header.seq = frameID;
+        odom.header.stamp = ros::Time::now();
+
+        odom.pose.pose.position.x = t.x();
+        odom.pose.pose.position.y = t.y();
+        odom.pose.pose.position.z = t.z();
+
+        odom.pose.pose.orientation.w = quad.w();
+        odom.pose.pose.orientation.x = quad.x();
+        odom.pose.pose.orientation.y = quad.y();
+        odom.pose.pose.orientation.z = quad.z();
+
+        odom_pub.publish(odom);
+    }
+
 }
 
 void settingsDefault(int preset) {
@@ -102,7 +136,6 @@ void settingsDefault(int preset) {
                "- original image resolution\n", preset == 0 ? "no " : "1x");
 
         playbackSpeed = (preset == 0 ? 0 : 1);
-        preload = preset == 1;
         setting_desiredImmatureDensity = 1500;
         setting_desiredPointDensity = 2000;
         setting_minFrames = 5;
@@ -123,7 +156,6 @@ void settingsDefault(int preset) {
                preset == 2 ? "no " : "5x");
 
         playbackSpeed = (preset == 2 ? 0 : 5);
-        preload = preset == 3;
         setting_desiredImmatureDensity = 600;
         setting_desiredPointDensity = 800;
         setting_minFrames = 4;
@@ -177,9 +209,11 @@ int main(int argc, char **argv) {
 
         setting_debugout_runquiet = true;
         printf("QUIET MODE, Disable most console output!\n");
+
+        setting_enableLoopClosing = true;
+        setting_fastLoopClosing = true;
     }
 
-//    FLAGS_colorlogtostderr = true;//    错误等级有颜色区分(Glog)
     setting_maxAffineWeight = 0.1;  // don't use affine brightness weight in Euroc!
 
     undistort = Undistort::getUndistorterForFile(calib, "", "");
@@ -189,6 +223,7 @@ int main(int argc, char **argv) {
     K = undistort->getK().cast<float>();
     w_out = undistort->getSize()[0];
     h_out = undistort->getSize()[1];
+
     setGlobalCalib(w_out, h_out, K);
 
     voc = shared_ptr<ORBVocabulary>(new ORBVocabulary());
@@ -216,12 +251,20 @@ int main(int argc, char **argv) {
     ros::NodeHandle nh;
     ros::Subscriber imgSub = nh.subscribe("/camera/color/image_raw", 1, &vidCb);
 
+    odom_pub = nh.advertise<nav_msgs::Odometry>("/odom",1);
+
     std::thread runthread([&]() {
         if (viewer)
             viewer->run();  // mac os should keep this in main thread.
     });
 
-    ros::spin();
+
+    while(ros::ok())
+    {
+
+        ros::spinOnce();
+    }
+//    ros::spin();
 
 //    fullSystem->printResult(output_file, true);
 //    fullSystem->printResult(output_file + ".noloop", false);
